@@ -51,11 +51,11 @@ class EmbeddingService:
             return
             
         try:
-            os.makedirs(os.path.dirname(settings.FAISS_INDEX_PATH), exist_ok=True)
-            faiss.write_index(self.index, f"{settings.FAISS_INDEX_PATH}.index")
-            with open(f"{settings.FAISS_INDEX_PATH}_chunk_ids.pkl", "wb") as f:
-                pickle.dump(self.chunk_ids, f)
-            print(f"✅ FAISS index saved to {settings.FAISS_INDEX_PATH}")
+                os.makedirs(os.path.dirname(settings.FAISS_INDEX_PATH), exist_ok=True)
+                faiss.write_index(self.index, f"{settings.FAISS_INDEX_PATH}.index")
+                with open(f"{settings.FAISS_INDEX_PATH}_chunk_ids.pkl", "wb") as f:
+                    pickle.dump(self.chunk_ids, f)
+                    print(f"✅ FAISS index saved to {settings.FAISS_INDEX_PATH}")
         except Exception as e:
             print(f"❌ Error saving FAISS index: {e}")
 
@@ -69,12 +69,9 @@ class EmbeddingService:
         return embeddings
 
     def add_embeddings(self, texts: List[str], chunk_ids: List[str]) -> List[int]:
-        """Add embeddings for new text chunks to the FAISS index"""
-        if not texts or not chunk_ids:
+        """Add embeddings to the FAISS index"""
+        if not texts:
             return []
-        
-        if len(texts) != len(chunk_ids):
-            raise ValueError("Number of texts must match number of chunk IDs")
         
         if not ML_AVAILABLE:
             # Mock implementation
@@ -83,23 +80,23 @@ class EmbeddingService:
             return list(range(start_idx, start_idx + len(texts)))
         
         try:
-            embeddings = self.generate_embeddings(texts)
-            
-            # Normalize embeddings for cosine similarity
-            faiss.normalize_L2(embeddings)
-            
-            # Add to index
-            start_idx = len(self.chunk_ids)
-            self.index.add(embeddings)
-            
-            # Update chunk IDs
-            self.chunk_ids.extend(chunk_ids)
-            
-            # Save index
-            self.save_index()
-            
-            # Return the indices of added embeddings
-            return list(range(start_idx, start_idx + len(texts)))
+                embeddings = self.generate_embeddings(texts)
+                
+                # Normalize embeddings for cosine similarity
+                faiss.normalize_L2(embeddings)
+                
+        # Add to index
+                        start_idx = len(self.chunk_ids)
+                        self.index.add(embeddings)
+                        
+                        # Update chunk IDs
+                        self.chunk_ids.extend(chunk_ids)
+                        
+                        # Save index
+        self.save_index()
+        
+        # Return the indices of added embeddings
+        return list(range(start_idx, start_idx + len(texts)))
         except Exception as e:
             print(f"❌ Error adding embeddings: {e}")
             return []

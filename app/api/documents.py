@@ -22,8 +22,8 @@ async def upload_document(
 ):
     """Upload a new document with enhanced timeout handling"""
     try:
-    document_service = DocumentService(db)
-    return await document_service.upload_document(file, current_user)
+        document_service = DocumentService(db)
+        return await document_service.upload_document(file, current_user)
     except HTTPException:
         # Re-raise HTTP exceptions as-is
         raise

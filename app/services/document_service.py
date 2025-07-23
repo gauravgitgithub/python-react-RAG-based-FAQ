@@ -28,50 +28,50 @@ class DocumentService:
     async def upload_document(self, file: UploadFile, user: User) -> Document:
         """Upload and process a document with timeout handling"""
         try:
-        # Validate file type
-        file_extension = os.path.splitext(file.filename)[1].lower()
+            # Validate file type
+            file_extension = os.path.splitext(file.filename)[1].lower()
             if file_extension not in settings.allowed_extensions_set:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"File type {file_extension} not allowed. Allowed types: {settings.ALLOWED_EXTENSIONS}"
-            )
-        
-        # Validate file size
-        if file.size and file.size > settings.MAX_FILE_SIZE:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"File size {file.size} exceeds maximum allowed size {settings.MAX_FILE_SIZE}"
-            )
-        
-        # Generate unique filename
-        unique_filename = f"{uuid.uuid4()}{file_extension}"
-        file_path = os.path.join(settings.UPLOAD_DIR, unique_filename)
-        
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"File type {file_extension} not allowed. Allowed types: {settings.ALLOWED_EXTENSIONS}"
+                )
+            
+            # Validate file size
+            if file.size and file.size > settings.MAX_FILE_SIZE:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"File size {file.size} exceeds maximum allowed size {settings.MAX_FILE_SIZE}"
+                )
+            
+            # Generate unique filename
+            unique_filename = f"{uuid.uuid4()}{file_extension}"
+            file_path = os.path.join(settings.UPLOAD_DIR, unique_filename)
+            
             # Save file with timeout
             content = await asyncio.wait_for(file.read(), timeout=settings.UPLOAD_TIMEOUT)
-        with open(file_path, "wb") as f:
-            f.write(content)
-        
+            with open(file_path, "wb") as f:
+                f.write(content)
+            
             # Extract text from document with timeout
             text_content = await asyncio.wait_for(
                 self._extract_text(file_path, file_extension), 
                 timeout=settings.PROCESSING_TIMEOUT
             )
-        
-        # Create document record
+            
+            # Create document record
             document = DocumentModel(
-            filename=unique_filename,
-            original_filename=file.filename,
-            file_path=file_path,
-            file_size=len(content),
-            file_type=file_extension,
-            uploaded_by=user.id
-        )
-        
-        self.db.add(document)
-        await self.db.commit()
-        await self.db.refresh(document)
-        
+                filename=unique_filename,
+                original_filename=file.filename,
+                file_path=file_path,
+                file_size=len(content),
+                file_type=file_extension,
+                uploaded_by=user.id
+            )
+            
+            self.db.add(document)
+            await self.db.commit()
+            await self.db.refresh(document)
+            
             # Process document chunks and embeddings with timeout
             await asyncio.wait_for(
                 self._process_document_chunks(document, text_content),
