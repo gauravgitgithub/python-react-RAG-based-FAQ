@@ -32,9 +32,30 @@ fi
 echo "🔧 Activating virtual environment..."
 source venv/bin/activate
 
+# Upgrade pip to latest version
+echo "📦 Upgrading pip..."
+pip install --upgrade pip
+
 # Install Python dependencies
 echo "📚 Installing Python dependencies..."
-pip install -r requirements-minimal.txt
+pip install -r requirements.txt
+
+# Verify critical dependencies are installed
+echo "🔍 Verifying critical dependencies..."
+python3 -c "import fastapi, uvicorn, sqlalchemy, faiss, sentence_transformers, openai, cohere; print('✅ All critical dependencies installed')" || {
+    echo "❌ Critical dependencies missing. Please check the installation."
+    exit 1
+}
+
+# Check if .env file exists
+if [ ! -f ".env" ]; then
+    echo "⚠️  .env file not found!"
+    echo "📝 Creating .env file from template..."
+    python3 setup_env.py
+    echo "🔧 Please edit the .env file with your configuration before continuing."
+    echo "💡 Run 'python3 setup_env.py help' for configuration guidance."
+    exit 1
+fi
 
 # Install frontend dependencies
 echo "📦 Installing frontend dependencies..."
@@ -74,19 +95,21 @@ pkill -f uvicorn
 pkill -f "npm start"
 pkill -f "react-scripts"
 
-# Start the backend server in background
+# Start the backend server in background with increased timeout
 echo "🌐 Starting FastAPI server..."
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 &
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --timeout-keep-alive 300 --timeout-graceful-shutdown 300 &
 BACKEND_PID=$!
 
 # Wait for backend to start
-sleep 3
+sleep 5
 
 # Check if backend is running
 if curl -s http://localhost:8000/ > /dev/null; then
     echo "✅ Backend is running on http://localhost:8000"
 else
     echo "❌ Backend failed to start"
+    echo "🔍 Checking for error logs..."
+    ps aux | grep uvicorn
     exit 1
 fi
 

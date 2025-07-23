@@ -16,11 +16,14 @@ class QAService:
         self.llm_service = LLMService()
 
     async def answer_question(self, question_request: QuestionRequest) -> AnswerResponse:
-        """Answer a question using RAG approach"""
+        """Answer a question using RAG approach with enhanced retrieval"""
+        # Determine optimal top_k based on question type
+        top_k = self._determine_top_k(question_request.question, question_request.top_k)
+        
         # Search for relevant chunks
         similar_chunks = self.embedding_service.search_similar(
             question_request.question, 
-            question_request.top_k
+            top_k
         )
         
         if not similar_chunks:
@@ -30,8 +33,15 @@ class QAService:
                 question=question_request.question
             )
         
+        # Filter chunks by similarity threshold (lowered for better retrieval)
+        filtered_chunks = self._filter_by_similarity(similar_chunks, threshold=0.1)
+        
+        if not filtered_chunks:
+            # If no chunks pass the threshold, use the top 2 chunks anyway
+            filtered_chunks = similar_chunks[:2]
+        
         # Get chunk details from database
-        source_chunks = await self._get_source_chunks(similar_chunks)
+        source_chunks = await self._get_source_chunks(filtered_chunks)
         
         # Generate answer using LLM
         answer = await self._generate_answer(question_request.question, source_chunks)
@@ -41,6 +51,30 @@ class QAService:
             sources=source_chunks,
             question=question_request.question
         )
+
+    def _determine_top_k(self, question: str, user_top_k: Optional[int] = None) -> int:
+        """Dynamically determine top_k based on question complexity"""
+        if user_top_k:
+            return user_top_k
+            
+        question_lower = question.lower()
+        
+        # Factual questions need less context
+        if any(word in question_lower for word in ['what', 'who', 'when', 'where']):
+            return 3
+        # Explanatory questions need more context
+        elif any(word in question_lower for word in ['how', 'why', 'explain', 'describe']):
+            return 7
+        # Procedural questions need detailed context
+        elif any(word in question_lower for word in ['steps', 'procedure', 'process', 'guide']):
+            return 8
+        # Default
+        else:
+            return 5
+
+    def _filter_by_similarity(self, chunks: List[tuple], threshold: float = 0.1) -> List[tuple]:
+        """Filter chunks by similarity threshold (lowered default for better retrieval)"""
+        return [(chunk_id, score) for chunk_id, score in chunks if score > threshold]
 
     async def _get_source_chunks(self, similar_chunks: List[tuple]) -> List[SourceChunk]:
         """Get detailed information about source chunks"""
@@ -78,25 +112,26 @@ class QAService:
         return source_chunks
 
     async def _generate_answer(self, question: str, source_chunks: List[SourceChunk]) -> str:
-        """Generate answer using LLM with context from source chunks"""
+        """Generate answer using LLM with enhanced context"""
         if not source_chunks:
             return "I couldn't find any relevant information to answer your question."
         
-        # Prepare context from source chunks
-        context = self._prepare_context(source_chunks)
+        # Prepare enhanced context from source chunks
+        context = self._prepare_enhanced_context(source_chunks)
         
         # Generate answer using LLM
         answer = await self.llm_service.generate_answer(question, context)
         
         return answer
 
-    def _prepare_context(self, source_chunks: List[SourceChunk]) -> str:
-        """Prepare context string from source chunks"""
+    def _prepare_enhanced_context(self, source_chunks: List[SourceChunk]) -> str:
+        """Prepare enhanced context string from source chunks with better formatting"""
         context_parts = []
         
         for i, chunk in enumerate(source_chunks, 1):
+            # Simplified context format for better LLM compatibility
             context_parts.append(
-                f"Source {i} (from {chunk.document_name}, chunk {chunk.chunk_index}):\n"
+                f"Source {i} (from {chunk.document_name}):\n"
                 f"{chunk.content}\n"
             )
         
@@ -125,5 +160,12 @@ class QAService:
             "total_documents": total_documents,
             "active_documents": active_documents,
             "total_chunks": total_chunks,
-            "faiss_index": faiss_stats
+            "faiss_index": faiss_stats,
+            "qa_config": {
+                "llm_provider": settings.LLM_PROVIDER,
+                "embedding_model": settings.EMBEDDING_MODEL,
+                "chunk_size": settings.CHUNK_SIZE,
+                "chunk_overlap": settings.CHUNK_OVERLAP,
+                "top_k_chunks": settings.TOP_K_CHUNKS
+            }
         } 

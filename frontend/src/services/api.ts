@@ -17,10 +17,10 @@ import {
 // API Configuration
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
 
-// Create axios instance
+// Create axios instance with longer timeout for uploads
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 300000, // 5 minutes for general requests
   headers: {
     'Content-Type': 'application/json',
   },
@@ -46,7 +46,9 @@ api.interceptors.response.use(
     return response;
   },
   (error: AxiosError<ApiError>) => {
-    if (error.response?.status === 401) {
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      toast.error('Request timed out. Please try again or upload a smaller file.');
+    } else if (error.response?.status === 401) {
       // Token expired or invalid
       localStorage.removeItem('access_token');
       localStorage.removeItem('user');
@@ -99,6 +101,7 @@ export const documentsAPI = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 600000, // 10 minutes for file uploads
       onUploadProgress: (progressEvent) => {
         if (progressEvent.total && onUploadProgress) {
           const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);

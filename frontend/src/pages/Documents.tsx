@@ -32,19 +32,27 @@ const Documents: React.FC = () => {
     }),
   });
 
-  // Upload mutation
+  // Upload mutation with enhanced error handling
   const uploadMutation = useMutation({
     mutationFn: (file: File) => documentsAPI.uploadDocument(file, setUploadProgress),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       queryClient.invalidateQueries({ queryKey: ['qa-stats'] });
-      toast.success('Document uploaded successfully!');
+      toast.success('Document uploaded and processed successfully!');
       setShowUploadModal(false);
       setSelectedFile(null);
       setUploadProgress(0);
     },
-    onError: () => {
-      toast.error('Failed to upload document');
+    onError: (error: any) => {
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        toast.error('Upload timed out. Please try with a smaller file or try again later.');
+      } else if (error.response?.status === 408) {
+        toast.error('Document processing timed out. Please try with a smaller file.');
+      } else if (error.response?.data?.detail) {
+        toast.error(`Upload failed: ${error.response.data.detail}`);
+      } else {
+        toast.error('Upload failed. Please try again.');
+      }
       setUploadProgress(0);
     },
   });
@@ -94,6 +102,8 @@ const Documents: React.FC = () => {
     if (!selectedFile) return;
     
     setIsUploading(true);
+    setUploadProgress(0);
+    
     try {
       await uploadMutation.mutateAsync(selectedFile);
     } finally {
@@ -114,159 +124,108 @@ const Documents: React.FC = () => {
   const documents = documentsData?.documents || [];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Documents</h1>
-          <p className="mt-2 text-gray-600">
-            Manage your documents and control which ones are active for Q&A.
-          </p>
-        </div>
-        
         {hasMinimumRole(UserRole.EDITOR) && (
           <button
             onClick={() => setShowUploadModal(true)}
-            className="btn-primary inline-flex items-center"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
           >
-            <PlusIcon className="h-5 w-5 mr-2" />
+            <PlusIcon className="w-5 h-5" />
             Upload Document
           </button>
         )}
       </div>
 
-      {/* Filter */}
-      <div className="mb-6">
-        <div className="flex space-x-4">
+      {/* Filter Tabs */}
+      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6">
+        {[
+          { key: 'all', label: 'All Documents' },
+          { key: 'active', label: 'Active' },
+          { key: 'inactive', label: 'Inactive' },
+        ].map((tab) => (
           <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-md text-sm font-medium ${
-              filter === 'all'
-                ? 'bg-primary-100 text-primary-700'
-                : 'text-gray-500 hover:text-gray-700'
+            key={tab.key}
+            onClick={() => setFilter(tab.key as any)}
+            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              filter === tab.key
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            All Documents
+            {tab.label}
           </button>
-          <button
-            onClick={() => setFilter('active')}
-            className={`px-4 py-2 rounded-md text-sm font-medium ${
-              filter === 'active'
-                ? 'bg-green-100 text-green-700'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Active
-          </button>
-          <button
-            onClick={() => setFilter('inactive')}
-            className={`px-4 py-2 rounded-md text-sm font-medium ${
-              filter === 'inactive'
-                ? 'bg-gray-100 text-gray-700'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Inactive
-          </button>
-        </div>
+        ))}
       </div>
 
       {/* Documents List */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="card animate-pulse">
-              <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-              <div className="h-3 bg-gray-200 rounded w-1/2 mb-4"></div>
-              <div className="h-8 bg-gray-200 rounded"></div>
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading documents...</p>
             </div>
-          ))}
+      ) : documents.length === 0 ? (
+        <div className="text-center py-12">
+          <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">No documents</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            {filter === 'all'
+              ? 'Get started by uploading a document.'
+              : `No ${filter} documents found.`}
+          </p>
         </div>
-      ) : documents.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {documents.map((doc) => (
-            <div key={doc.id} className="card">
-              <div className="flex items-start justify-between">
+      ) : (
+        <div className="bg-white shadow overflow-hidden sm:rounded-md">
+          <ul className="divide-y divide-gray-200">
+            {documents.map((document) => (
+              <li key={document.id}>
+                <div className="px-4 py-4 flex items-center justify-between">
                 <div className="flex items-center">
-                  <DocumentTextIcon className="h-8 w-8 text-gray-400 mr-3" />
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-900 truncate">
-                      {doc.original_filename}
-                    </h3>
-                    <p className="text-xs text-gray-500">
-                      {new Date(doc.created_at).toLocaleDateString()}
+                    <DocumentTextIcon className="h-8 w-8 text-gray-400" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-900">
+                        {document.original_filename}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {document.file_type.toUpperCase()} • {(document.file_size / 1024 / 1024).toFixed(2)} MB
                     </p>
                   </div>
                 </div>
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    doc.is_active
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}
-                >
-                  {doc.is_active ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-              
-              <div className="mt-4 space-y-2">
-                <div className="text-xs text-gray-500">
-                  <span>Size: {(doc.file_size / 1024).toFixed(1)} KB</span>
-                  <span className="mx-2">•</span>
-                  <span>Type: {doc.file_type}</span>
-                </div>
-                
-                <div className="flex space-x-2">
+                  <div className="flex items-center space-x-2">
                   {hasMinimumRole(UserRole.EDITOR) && (
                     <>
                       <button
-                        onClick={() => handleToggleActive(doc.id)}
+                          onClick={() => handleToggleActive(document.id)}
                         disabled={toggleActiveMutation.isPending}
-                        className="btn-secondary flex-1 text-xs py-1"
+                          className={`p-2 rounded-md ${
+                            document.is_active
+                              ? 'text-green-600 hover:bg-green-50'
+                              : 'text-gray-400 hover:bg-gray-50'
+                          }`}
+                          title={document.is_active ? 'Deactivate' : 'Activate'}
                       >
-                        {doc.is_active ? (
-                          <>
-                            <EyeSlashIcon className="h-4 w-4 mr-1" />
-                            Deactivate
-                          </>
+                          {document.is_active ? (
+                            <EyeIcon className="h-5 w-5" />
                         ) : (
-                          <>
-                            <EyeIcon className="h-4 w-4 mr-1" />
-                            Activate
-                          </>
+                            <EyeSlashIcon className="h-5 w-5" />
                         )}
                       </button>
                       <button
-                        onClick={() => handleDelete(doc.id)}
+                          onClick={() => handleDelete(document.id)}
                         disabled={deleteMutation.isPending}
-                        className="btn-danger text-xs py-1 px-2"
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-md"
+                          title="Delete"
                       >
-                        <TrashIcon className="h-4 w-4" />
+                          <TrashIcon className="h-5 w-5" />
                       </button>
                     </>
                   )}
                 </div>
               </div>
-            </div>
+              </li>
           ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <DocumentTextIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No documents found</h3>
-          <p className="text-gray-500 mb-4">
-            {filter === 'all'
-              ? 'Get started by uploading your first document.'
-              : `No ${filter} documents found.`}
-          </p>
-          {hasMinimumRole(UserRole.EDITOR) && (
-            <button
-              onClick={() => setShowUploadModal(true)}
-              className="btn-primary inline-flex items-center"
-            >
-              <PlusIcon className="h-5 w-5 mr-2" />
-              Upload Document
-            </button>
-          )}
+          </ul>
         </div>
       )}
 
@@ -279,52 +238,73 @@ const Documents: React.FC = () => {
               
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select File (PDF or TXT, max 10MB)
+                  Select File
                 </label>
                 <input
                   type="file"
                   accept=".pdf,.txt"
                   onChange={handleFileSelect}
-                  className="input-field"
+                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                 />
-                {selectedFile && (
-                  <p className="mt-2 text-sm text-gray-600">
-                    Selected: {selectedFile.name}
-                  </p>
-                )}
               </div>
+
+                {selectedFile && (
+                <div className="mb-4 p-3 bg-gray-50 rounded-md">
+                  <p className="text-sm text-gray-700">
+                    <strong>File:</strong> {selectedFile.name}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Size: {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+              </div>
+              )}
 
               {isUploading && (
                 <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-gray-700">Processing...</span>
+                    <span className="text-sm text-gray-500">{uploadProgress}%</span>
+                  </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
-                      className="bg-primary-600 h-2 rounded-full transition-all duration-300"
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${uploadProgress}%` }}
                     ></div>
                   </div>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Uploading... {uploadProgress}%
+                  <p className="text-xs text-gray-500 mt-1">
+                    This may take a few minutes for large files...
                   </p>
                 </div>
               )}
 
-              <div className="flex space-x-3">
-                <button
-                  onClick={handleUpload}
-                  disabled={!selectedFile || isUploading}
-                  className="btn-primary flex-1"
-                >
-                  {isUploading ? 'Uploading...' : 'Upload'}
-                </button>
+              <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => {
                     setShowUploadModal(false);
                     setSelectedFile(null);
                     setUploadProgress(0);
                   }}
-                  className="btn-secondary"
+                  disabled={isUploading}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md disabled:opacity-50"
                 >
                   Cancel
+                </button>
+                <button
+                  onClick={handleUpload}
+                  disabled={!selectedFile || isUploading}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isUploading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <CloudArrowUpIcon className="h-4 w-4" />
+                      Upload
+                    </>
+                  )}
                 </button>
               </div>
             </div>

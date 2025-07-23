@@ -2,6 +2,8 @@ import os
 import pickle
 import numpy as np
 from typing import List, Tuple, Optional
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 # Mock imports for when ML dependencies are not available
 try:
     from sentence_transformers import SentenceTransformer
@@ -11,6 +13,7 @@ except ImportError:
     ML_AVAILABLE = False
     print("Warning: ML dependencies (sentence_transformers, faiss) not available. Using mock embeddings.")
 from app.core.config import settings
+from app.models.document import DocumentChunk
 
 
 class EmbeddingService:
@@ -47,10 +50,14 @@ class EmbeddingService:
         if not ML_AVAILABLE:
             return
             
+        try:
         os.makedirs(os.path.dirname(settings.FAISS_INDEX_PATH), exist_ok=True)
         faiss.write_index(self.index, f"{settings.FAISS_INDEX_PATH}.index")
         with open(f"{settings.FAISS_INDEX_PATH}_chunk_ids.pkl", "wb") as f:
             pickle.dump(self.chunk_ids, f)
+            print(f"✅ FAISS index saved to {settings.FAISS_INDEX_PATH}")
+        except Exception as e:
+            print(f"❌ Error saving FAISS index: {e}")
 
     def generate_embeddings(self, texts: List[str]) -> np.ndarray:
         """Generate embeddings for a list of texts"""
@@ -72,6 +79,7 @@ class EmbeddingService:
             self.chunk_ids.extend(chunk_ids)
             return list(range(start_idx, start_idx + len(texts)))
         
+        try:
         embeddings = self.generate_embeddings(texts)
         
         # Normalize embeddings for cosine similarity
@@ -89,6 +97,9 @@ class EmbeddingService:
         
         # Return the indices of added embeddings
         return list(range(start_idx, start_idx + len(texts)))
+        except Exception as e:
+            print(f"❌ Error adding embeddings: {e}")
+            return []
 
     def search_similar(self, query: str, top_k: int = 5) -> List[Tuple[str, float]]:
         """Search for similar chunks given a query"""
@@ -151,6 +162,56 @@ class EmbeddingService:
         
         # Save updated index
         self.save_index()
+
+    def rebuild_index(self, db: AsyncSession = None):
+        """Rebuild the FAISS index from all active document chunks in the database"""
+        if not ML_AVAILABLE:
+            print("⚠️  Cannot rebuild index: ML dependencies not available")
+            return
+        
+        try:
+            # If no database session provided, we'll rebuild from existing chunks
+            if db is None:
+                print("🔄 Rebuilding index from existing chunks...")
+                # Create new index
+                dimension = self.model.get_sentence_embedding_dimension()
+                self.index = faiss.IndexFlatIP(dimension)
+                self.chunk_ids = []
+                self.save_index()
+                print("✅ Index rebuilt successfully")
+                return
+            
+            # Get all active document chunks from database
+            print("🔄 Rebuilding index from database chunks...")
+            result = db.execute(select(DocumentChunk))
+            chunks = result.scalars().all()
+            
+            if not chunks:
+                print("⚠️  No chunks found in database")
+                return
+            
+            # Prepare data for rebuilding
+            texts = []
+            chunk_ids = []
+            
+            for chunk in chunks:
+                texts.append(chunk.content)
+                chunk_ids.append(chunk.embedding_id)
+            
+            # Create new index
+            dimension = self.model.get_sentence_embedding_dimension()
+            self.index = faiss.IndexFlatIP(dimension)
+            self.chunk_ids = []
+            
+            # Add all embeddings
+            if texts:
+                self.add_embeddings(texts, chunk_ids)
+                print(f"✅ Index rebuilt with {len(chunks)} chunks")
+            else:
+                print("⚠️  No text content found in chunks")
+                
+        except Exception as e:
+            print(f"❌ Error rebuilding index: {e}")
 
     def get_index_stats(self) -> dict:
         """Get statistics about the current index"""

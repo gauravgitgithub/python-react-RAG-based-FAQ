@@ -2,9 +2,68 @@
 
 A comprehensive, modular, asynchronous Python backend using FastAPI for a RAG-based document ingestion and Q&A system, with a modern React TypeScript frontend.
 
-## 🚀 Features
+## 🎯 **Required Features Implementation Status**
 
-### Backend (FastAPI)
+### ✅ **1. Authentication**
+
+- **JWT-based login, signup, and role-based access** (admin, editor, viewer)
+- **Secure protected endpoints** with role guards
+- **Password hashing** using bcrypt
+- **Token expiration** with configurable lifetime
+- **Role hierarchy** with minimum role requirements
+
+### ✅ **2. Document Ingestion**
+
+- **PDF/TXT document uploads** via `/api/v1/documents/upload`
+- **Document chunking** with overlapping chunks (configurable size/overlap)
+- **Embedding generation** using Sentence Transformer model (`all-MiniLM-L6-v2`)
+- **FAISS vector storage** for efficient similarity search
+- **PostgreSQL storage** for raw text + chunk metadata
+- **Background processing** with timeout handling
+
+### ✅ **3. Document Selection**
+
+- **`/api/v1/documents` API** to list and filter uploaded documents
+- **`/api/v1/documents/{id}/toggle-active` API** to mark documents active for Q&A
+- **Document management** with status tracking
+- **Bulk operations** support
+
+### ✅ **4. Q&A API**
+
+- **Question acceptance** via `/api/v1/qa/ask`
+- **Top-K chunk retrieval** from FAISS with similarity scoring
+- **Multiple LLM providers**: OpenAI, Cohere, or stubbed
+- **Answer generation** with source chunk snippets
+- **Enhanced RAG pipeline** with similarity filtering
+
+### ✅ **5. Architecture Requirements**
+
+- **FastAPI + async architecture** with Uvicorn
+- **Modular structure** with services, routers, models, utils
+- **Background tasks** for document processing
+- **Unit tests** with pytest (≥70% coverage target)
+- **Dockerfile + Docker Compose** for local setup
+- **Swagger docs** enabled at `/docs`
+
+### ✅ **6. Frontend Integration**
+
+- **React + TypeScript** with modern architecture
+- **Authentication UI** with login/register/logout
+- **Document upload** with progress tracking
+- **Q&A interface** with source display
+- **Role-based UI** with protected routes
+- **Responsive design** with Tailwind CSS
+
+### ✅ **7. Documentation**
+
+- **Comprehensive README** with setup instructions
+- **API documentation** with usage examples
+- **Architecture overview** with diagrams
+- **Environment configuration** guide
+
+## 🚀 **Core Features**
+
+### **Backend (FastAPI)**
 
 - **Authentication**: JWT-based login, signup, and role-based access (admin, editor, viewer)
 - **Document Ingestion**: PDF/TXT upload, chunking, embedding generation with Sentence Transformers
@@ -13,8 +72,9 @@ A comprehensive, modular, asynchronous Python backend using FastAPI for a RAG-ba
 - **Background Processing**: Celery + Redis for async document processing
 - **Database**: PostgreSQL with SQLAlchemy async ORM
 - **Testing**: Comprehensive test suite with 70%+ coverage target
+- **LLM Integration**: Support for OpenAI, Cohere, and stubbed providers
 
-### Frontend (React + TypeScript)
+### **Frontend (React + TypeScript)**
 
 - **Modern UI**: Responsive design with Tailwind CSS
 - **Authentication**: Secure login/register with role-based UI
@@ -23,17 +83,31 @@ A comprehensive, modular, asynchronous Python backend using FastAPI for a RAG-ba
 - **Dashboard**: System statistics and quick actions
 - **User Management**: Admin interface for user management
 - **State Management**: TanStack Query for server state
+- **Form Validation**: Formik + Yup for robust form handling
 
-## 🏗️ Architecture
+## 🏗️ **Architecture**
 
 ```
 RAG-based-FAQ/
 ├── app/                    # FastAPI Backend
 │   ├── api/               # API routers
+│   │   ├── auth.py        # Authentication endpoints
+│   │   ├── documents.py   # Document management
+│   │   └── qa.py          # Q&A endpoints
 │   ├── core/              # Configuration, database, security
+│   │   ├── config.py      # Environment configuration
+│   │   ├── database.py    # Database connection
+│   │   └── security.py    # JWT authentication
 │   ├── models/            # Database models
+│   │   ├── user.py        # User model with roles
+│   │   └── document.py    # Document and chunk models
 │   ├── schemas/           # Pydantic schemas
 │   ├── services/          # Business logic services
+│   │   ├── auth_service.py      # Authentication logic
+│   │   ├── document_service.py  # Document processing
+│   │   ├── embedding_service.py # FAISS operations
+│   │   ├── qa_service.py        # RAG pipeline
+│   │   └── llm_service.py       # LLM integration
 │   ├── tasks/             # Background tasks
 │   ├── utils/             # Utility functions
 │   └── main.py            # FastAPI application
@@ -53,31 +127,83 @@ RAG-based-FAQ/
 └── package.json           # Root package.json
 ```
 
-## 🚀 Quick Start
+## 🛠️ **Technology Stack**
 
-### Option 1: Full Stack Development (Recommended)
+### **Backend**
+
+- **Framework**: FastAPI (async, modern Python web framework)
+- **Server**: Uvicorn (ASGI server)
+- **Database**: PostgreSQL (primary database)
+- **ORM**: SQLAlchemy (async ORM)
+- **Vector DB**: FAISS (similarity search)
+- **Cache/Queue**: Redis (caching and background tasks)
+- **Authentication**: JWT with bcrypt password hashing
+- **File Processing**: PyPDF2 (PDF text extraction)
+- **ML/AI**: Sentence Transformers (embeddings)
+- **LLM**: OpenAI API, Cohere API, or stubbed provider
+- **Testing**: pytest with async support
+- **Documentation**: Swagger/OpenAPI
+
+### **Frontend**
+
+- **Framework**: React 19 with TypeScript
+- **Routing**: React Router v6
+- **State Management**: TanStack Query (React Query)
+- **Styling**: Tailwind CSS
+- **Forms**: Formik + Yup validation
+- **HTTP Client**: Axios with interceptors
+- **Icons**: Heroicons
+- **Notifications**: React Hot Toast
+- **Testing**: React Testing Library + Jest
+
+### **DevOps & Tools**
+
+- **Containerization**: Docker + Docker Compose
+- **Environment**: Environment variables with .env
+- **Version Control**: Git
+- **Package Management**: pip (Python), npm (Node.js)
+
+## 🚀 **Quick Start**
+
+### **Prerequisites**
+
+- Python 3.10+
+- Node.js 18+
+- PostgreSQL
+- Redis
+- Docker (optional)
+
+### **Option 1: Full Stack Development (Recommended)**
 
 1. **Clone and setup:**
 
    ```bash
    git clone <repository-url>
    cd RAG-based-FAQ
-   npm install
-   npm run install:all
    ```
 
-2. **Start both backend and frontend:**
+2. **Setup environment:**
 
    ```bash
-   npm run start:dev
+   # Create environment file
+   cp .env.example .env
+
+   # Edit .env with your configuration
+   nano .env
    ```
 
-3. **Access the application:**
-   - Frontend: http://localhost:3000
+3. **Start both backend and frontend:**
+
+   ```bash
+   ./start.sh
+   ```
+
+4. **Access the application:**
+   - Frontend: http://localhost:3001
    - Backend API: http://localhost:8000
    - API Docs: http://localhost:8000/docs
 
-### Option 2: Docker Setup
+### **Option 2: Docker Setup**
 
 1. **Start all services:**
 
@@ -89,54 +215,76 @@ RAG-based-FAQ/
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:8000
 
-### Option 3: Backend Only
+### **Option 3: Manual Setup**
 
-1. **Setup Python environment:**
+1. **Backend setup:**
 
    ```bash
+   # Create virtual environment
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
 
-2. **Start backend:**
-   ```bash
+   # Install dependencies
+   pip install -r requirements.txt
+
+   # Setup environment
+   cp .env.example .env
+   # Edit .env with your configuration
+
+   # Start backend
    uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
    ```
 
-### Option 4: Frontend Only
-
-1. **Setup frontend:**
-
+2. **Frontend setup:**
    ```bash
    cd frontend
    npm install
-   ```
-
-2. **Start frontend:**
-   ```bash
    npm start
    ```
 
-## 🔧 Configuration
+## 🔧 **Configuration**
 
-### Environment Variables
+### **Environment Variables**
 
-Create a `.env` file in the root directory:
+Create a `.env` file using the provided template:
 
-```env
-# Backend Configuration
-DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/rag_faq
-REDIS_URL=redis://localhost:6379
-SECRET_KEY=your-secret-key-here-change-in-production
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-# Frontend Configuration
-REACT_APP_API_URL=http://localhost:8000/api/v1
+```bash
+cp .env.example .env
 ```
 
-### Database Setup
+Key configuration sections:
+
+- **Security**: JWT secret key, token expiration
+- **Database**: PostgreSQL connection string
+- **LLM Provider**: OpenAI, Cohere, or stubbed
+- **RAG Settings**: Chunk size, overlap, similarity threshold
+- **File Upload**: Size limits, allowed extensions
+- **Timeouts**: Upload and processing timeouts
+
+### **LLM Provider Setup**
+
+#### **OpenAI (Recommended)**
+
+```env
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-your-openai-api-key
+```
+
+#### **Cohere**
+
+```env
+LLM_PROVIDER=cohere
+COHERE_API_KEY=your-cohere-api-key
+```
+
+#### **Stubbed (Testing)**
+
+```env
+LLM_PROVIDER=stubbed
+# No API key needed
+```
+
+### **Database Setup**
 
 The system uses PostgreSQL. You can either:
 
@@ -151,30 +299,37 @@ The system uses PostgreSQL. You can either:
    - Create database: `rag_faq`
    - Update DATABASE_URL in .env
 
-## 📚 API Documentation
+## 📚 **API Documentation**
 
-### Authentication Endpoints
+### **Authentication Endpoints**
 
 - `POST /api/v1/auth/signup` - Register new user
 - `POST /api/v1/auth/login` - Login user
 - `GET /api/v1/auth/me` - Get current user
+- `PUT /api/v1/auth/me` - Update current user
 
-### Document Endpoints
+### **Document Endpoints**
 
 - `POST /api/v1/documents/upload` - Upload document
 - `GET /api/v1/documents` - List documents
 - `PUT /api/v1/documents/{id}` - Update document
 - `DELETE /api/v1/documents/{id}` - Delete document
 - `POST /api/v1/documents/{id}/toggle-active` - Toggle document active status
+- `GET /api/v1/documents/{id}/chunks` - Get document chunks
 
-### Q&A Endpoints
+### **Q&A Endpoints**
 
 - `POST /api/v1/qa/ask` - Ask a question
 - `GET /api/v1/qa/stats` - Get system statistics
 
-## 🧪 Testing
+### **Admin Endpoints**
 
-### Backend Tests
+- `GET /api/v1/auth/users` - Get all users (admin only)
+- `PUT /api/v1/auth/users/{id}` - Update user (admin only)
+
+## 🧪 **Testing**
+
+### **Backend Tests**
 
 ```bash
 # Run all tests
@@ -187,16 +342,16 @@ pytest --cov=app --cov-report=html
 pytest tests/test_auth.py
 ```
 
-### Frontend Tests
+### **Frontend Tests**
 
 ```bash
 cd frontend
 npm test
 ```
 
-## 🚀 Deployment
+## 🚀 **Deployment**
 
-### Production Build
+### **Production Build**
 
 1. **Build frontend:**
 
@@ -215,14 +370,14 @@ npm test
    uvicorn app.main:app --host 0.0.0.0 --port 8000
    ```
 
-### Docker Production
+### **Docker Production**
 
 ```bash
 # Build and run production containers
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
-## 🔐 Security Features
+## 🔐 **Security Features**
 
 - **JWT Authentication** with configurable expiration
 - **Role-based Access Control** (Admin, Editor, Viewer)
@@ -230,8 +385,9 @@ docker-compose -f docker-compose.prod.yml up -d
 - **CORS Protection** with configurable origins
 - **Input Validation** using Pydantic schemas
 - **SQL Injection Protection** via SQLAlchemy ORM
+- **File Upload Security** with type and size restrictions
 
-## 📊 Performance Features
+## 📊 **Performance Features**
 
 - **Async Architecture** for non-blocking I/O
 - **Background Processing** for heavy tasks
@@ -239,36 +395,24 @@ docker-compose -f docker-compose.prod.yml up -d
 - **Vector Search** with FAISS
 - **Connection Pooling** for database
 - **React Query** for frontend caching
+- **Timeout Handling** for long-running operations
 
-## 🤝 Contributing
+## 🎯 **RAG Pipeline**
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass
-6. Submit a pull request
+### **Document Processing Flow**
 
-## 📄 License
+1. **File Upload** → API validation
+2. **Text Extraction** → PDF/TXT parsing
+3. **Chunking** → Overlapping text chunks
+4. **Embedding Generation** → Sentence Transformers
+5. **Vector Storage** → FAISS index
+6. **Metadata Storage** → PostgreSQL
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+### **Question Answering Flow**
 
-## 🆘 Support
-
-For issues and questions:
-
-1. Check the documentation
-2. Review the API docs at `/docs`
-3. Check the test files for usage examples
-4. Open an issue on GitHub
-
-## 🔮 Roadmap
-
-- [ ] Real-time notifications
-- [ ] Advanced document search
-- [ ] Document versioning
-- [ ] Multi-language support
-- [ ] Advanced analytics
-- [ ] API rate limiting
-- [ ] WebSocket support
-- [ ] Mobile app
+1. **Question Input** → User query
+2. **Query Embedding** → Sentence Transformers
+3. **Similarity Search** → FAISS index
+4. **Context Retrieval** → Top-K chunks
+5. **Answer Generation** → LLM (OpenAI/Cohere/Stubbed)
+6. **Response Formatting** → Answer + sources
